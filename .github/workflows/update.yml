@@ -1,0 +1,28 @@
+name: Update stats
+on:
+  schedule:
+    - cron: "0 7 * * 2"   # 3am EDT
+    - cron: "0 8 * * 2"   # 3am EST (after the November clock change)
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+      - run: python pull_data.py
+        env:
+          LEAGUE_ID: ${{ secrets.LEAGUE_ID }}
+          YEAR: "2026"
+          SEASON_START: "2026-09-10"
+          ESPN_S2: ${{ secrets.ESPN_S2 }}
+          SWID: ${{ secrets.SWID }}
+      - run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.json
+          git diff --cached --quiet || (git commit -m "Update data" && git push)
