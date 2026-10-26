@@ -37,7 +37,7 @@ tr.lg td{font-weight:700}td small{display:block;color:var(--mu);font-size:11px}
 <nav id="nav" hidden></nav></header>
 <main>
 <div class="banner" id="mock" hidden>Showing mock data. Once data.json exists next to this page, real league data loads automatically.</div>
-<div class="bar" id="bar"><label>Time range <select id="rng"><option value="0">Full season</option><option value="3">Last 3 weeks</option><option value="5">Last 5 weeks</option><option value="8">Last 8 weeks</option></select></label><span class="note" id="wk"></span></div>
+<div class="banner" id="warn" hidden></div><div class="note" id="info" style="margin-bottom:8px"></div><div class="bar" id="bar"><label>Time range <select id="rng"><option value="0">Full season</option><option value="3">Last 3 weeks</option><option value="5">Last 5 weeks</option><option value="8">Last 8 weeks</option></select></label><span class="note" id="wk"></span></div>
 <section data-p="wins"><h2>Expected Wins</h2><div class="note">Each week, win probability is the share of other teams you outscored. Diff is actual wins minus expected (positive means lucky). Tap a column header to sort.</div><div class="w" id="s1"></div></section>
 <section data-p="sos" hidden><h2>Strength of Schedule</h2><div class="note">Opponent points per game vs. the league average. Positive means a tougher schedule.</div><div class="w" id="s2"></div></section>
 <section data-p="pos" hidden><h2>Average Scoring by Position</h2><div class="note">Starting lineup slots only.</div><div class="w" id="s3"></div></section>
@@ -139,7 +139,7 @@ function render(){
   return[i,...T.map(j=>{const c=m[i][j];return{h:`${c.w}-${c.l}${c.t?'-'+c.t:''}`,v:c.p,s:heat((c.p-.5)*4)+(i===j?';font-weight:700;outline:1px solid var(--ac);outline-offset:-2px':'')}}),{h:f(av*100,0)+'%',v:av,s:''}]}));
 }
 function renderHft(){
- const H=D.hft;if(!H||!H.bench){$('hn').textContent='No HFT data in data.json yet.';return}
+ const H=D.hft;if(!H||!H.bench){$('hn').textContent=D.hft_note||(D.hft===undefined?'This data.json has no HFT data: it was made by an older pull_data.py. Run the Update stats workflow again.':'HFT data is missing from data.json.');return}
  const B=H.bench.scores,N=D.reg_weeks||B.length,cum=a=>a.reduce((r,x)=>(r.push((r.length?r[r.length-1]:0)+x),r),[]);
  const hs=D.weeks.map(w=>Math.round(P.reduce((a,p)=>a+((w.scores[H.team]||{})[p]||0),0)*10)/10),hc=cum(hs),bc=cum(B),pl=hs.length;
  const hT=hc[pl-1]||0,bT=bc[bc.length-1],left=N-pl,need=left>0?(bT-hT)/left:null,bn=H.bench.name+' '+H.bench.year;
@@ -163,9 +163,10 @@ function renderHft(){
 function renderWv(){
  const wv=D.waivers||[],since=(n,t,a,b)=>D.weeks.filter(w=>w.week>=a&&w.week<(b||1e9)).reduce((s,w)=>s+(w.starters[t]||[]).filter(x=>x.n===n).reduce((q,x)=>q+x.pts,0),0);
  const rs=wv.map(x=>({...x,pts:since(x.n,x.team,x.week,x.drop_week)})),sp=rs.reduce((a,x)=>a+x.bid,0),L=sp?rs.reduce((a,x)=>a+x.pts,0)/sp:1;
- $('s8').innerHTML=rs.length?table(['Date','Team','Player','Pos','Type','$','Starter pts','Pts/$'],rs.map(x=>{const r=x.bid>0?x.pts/x.bid:null;return[x.date,e(x.team),e(x.n),x.p,x.type,{h:x.bid,s:'',v:x.bid},{h:f(x.pts),s:'',v:x.pts},r==null?{h:'–',s:'',v:-1}:{h:f(r,2),s:heat((r-L)/L*1.5),v:r}]})):'<div class="note">No waiver adds yet.</div>';
+ $('s8').innerHTML=rs.length?table(['Date','Team','Player','Pos','Type','$','Starter pts','Pts/$'],rs.map(x=>{const r=x.bid>0?x.pts/x.bid:null;return[x.date,e(x.team),e(x.n),x.p,x.type,{h:x.bid,s:'',v:x.bid},{h:f(x.pts),s:'',v:x.pts},r==null?{h:'–',s:'',v:-1}:{h:f(r,2),s:heat((r-L)/L*1.5),v:r}]})):`<div class="note">${D.waivers===undefined?'This data.json has no waiver data: it was made by an older pull_data.py. Run the Update stats workflow again.':'No waiver adds found in the activity feed.'}</div>`;
  $('s9').innerHTML=table(['Team','Adds','$ spent','Starter pts','Pts/$','Pts per add'],D.teams.map(t=>{const l=rs.filter(x=>x.team===t),c=l.reduce((a,x)=>a+x.bid,0),p=l.reduce((a,x)=>a+x.pts,0);return[t,l.length,c,{h:f(p),s:'',v:p},c?{h:f(p/c,2),s:heat((p/c-L)/L*1.5),v:p/c}:{h:'–',s:'',v:-1},l.length?f(p/l.length):'–']}).sort((a,b)=>b[3].v-a[3].v));
 }
+function info(){const w=D.weeks.length?D.weeks[D.weeks.length-1].week:0;$('info').textContent=D.generated?`Completed weeks through ${w} · updated ${D.generated}`:`Weeks through ${w}`;const er=(D.debug&&D.debug.errors)||[];if(er.length){$('warn').hidden=false;$('warn').textContent='Some data failed to load: '+er.join(' | ')}}
 function go(id){
  if(!PAGES.some(p=>p[0]===id))id='wins';
  document.querySelectorAll('section').forEach(s=>s.hidden=s.dataset.p!==id);
@@ -180,5 +181,5 @@ $('nav').onclick=e=>{const a=e.target.closest('a');if(a)go(a.dataset.p)};
 $('mb').onclick=()=>menu($('nav').hidden);
 menu(innerWidth>=700);
 let D;
-fetch('data.json').then(r=>r.ok?r.json():Promise.reject()).catch(()=>{$('mock').hidden=false;return mock()}).then(d=>{D=d;$('rng').onchange=render;render();renderHft();renderWv();go(location.hash.slice(1))});
+fetch('data.json').then(r=>r.ok?r.json():Promise.reject()).catch(()=>{$('mock').hidden=false;return mock()}).then(d=>{D=d;if(D.last_complete_week)D.weeks=D.weeks.filter(w=>w.week<=D.last_complete_week);info();$('rng').onchange=render;render();renderHft();renderWv();go(location.hash.slice(1))});
 </script></body></html>
