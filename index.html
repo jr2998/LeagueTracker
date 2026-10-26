@@ -31,28 +31,31 @@ th[data-d="a"]::after{content:" ▲"}th[data-d="d"]::after{content:" ▼"}
 tr.lg td{font-weight:700}td small{display:block;color:var(--mu);font-size:11px}
 .banner{border:1px dashed var(--ac);color:var(--ac);border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:12px}
 .bar[hidden]{display:none}.lgd{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--mu);margin-top:8px}.lgd i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}svg text{fill:var(--mu);font-size:10px}
+.cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.cards div{flex:1 1 150px;border:1px solid var(--bd);border-radius:10px;padding:10px 12px}.cards b{display:block;font-size:20px}.cards span{color:var(--mu);font-size:12px}
 </style></head><body>
 <header><div class="top"><b>🏈 League Stats</b><span id="cur"></span><button id="mb" aria-expanded="false" aria-controls="nav">☰ Menu</button></div>
 <nav id="nav" hidden></nav></header>
 <main>
 <div class="banner" id="mock" hidden>Showing mock data. Once data.json exists next to this page, real league data loads automatically.</div>
 <div class="bar" id="bar"><label>Time range <select id="rng"><option value="0">Full season</option><option value="3">Last 3 weeks</option><option value="5">Last 5 weeks</option><option value="8">Last 8 weeks</option></select></label><span class="note" id="wk"></span></div>
-<section data-p="wins"><h2>Expected wins</h2><div class="note">Each week, win probability is the share of other teams you outscored. Diff is actual wins minus expected (positive means lucky). Tap a column header to sort.</div><div class="w" id="s1"></div></section>
-<section data-p="sos" hidden><h2>Strength of schedule</h2><div class="note">Opponent points per game vs. the league average. Positive means a tougher schedule.</div><div class="w" id="s2"></div></section>
+<section data-p="wins"><h2>Expected Wins</h2><div class="note">Each week, win probability is the share of other teams you outscored. Diff is actual wins minus expected (positive means lucky). Tap a column header to sort.</div><div class="w" id="s1"></div></section>
+<section data-p="sos" hidden><h2>Strength of Schedule</h2><div class="note">Opponent points per game vs. the league average. Positive means a tougher schedule.</div><div class="w" id="s2"></div></section>
 <section data-p="pos" hidden><h2>Average scoring by position</h2><div class="note">Starting lineup slots only.</div><div class="w" id="s3"></div></section>
 <section data-p="dev" hidden><h2>Vs. league average by position</h2><div class="note">Standard deviations from the league mean (spread of team averages), with the point difference per game beneath.</div><div class="w" id="s4"></div><h2 style="margin-top:18px">Standard deviations by position</h2><label>Team <select id="tsel"></select></label><div class="w" id="ch"></div></section>
-<section data-p="sched" hidden><h2>Schedule comparison</h2><div class="note">Each row is a team’s weekly scores; each column is whose schedule they play. Weeks where a schedule’s opponent is the row team itself are skipped. The outlined diagonal is the actual record.</div><div class="w" id="s5"></div></section>
-<section data-p="trades" hidden><h2>Trade analyzer</h2><div class="note">Points scored in the starting lineup since each trade by the players each team received. Edge is the first team minus the second team.</div><div class="w" id="s6"></div></section>
-<section data-p="draft" hidden><h2>Draft analyzer</h2><div class="note">Draft position is the order a player was drafted among his position; current position is his rank by points scored to date. Difference is draft position minus current position, so positive means he outperformed his draft slot. DST and K are excluded.</div><div class="w" id="s7"></div></section>
+<section data-p="sched" hidden><h2>Schedule Comparison</h2><div class="note">Each row is a team’s weekly scores; each column is whose schedule they play. Weeks where a schedule’s opponent is the row team itself are skipped. The outlined diagonal is the actual record.</div><div class="w" id="s5"></div></section>
+<section data-p="trades" hidden><h2>Trade Analyzer</h2><div class="note">Points scored in the starting lineup since each trade by the players each team received. Edge is the first team minus the second team.</div><div class="w" id="s6"></div></section>
+<section data-p="draft" hidden><h2>Draft Analyzer</h2><div class="note">Draft position is the order a player was drafted among his position; current position is his rank by points scored to date. Difference is draft position minus current position, so positive means he outperformed his draft slot. DST and K are excluded.</div><div class="w" id="s7"></div></section>
+<section data-p="hft" hidden><h2>HFT Tracker</h2><div class="note" id="hn"></div><div class="cards" id="hc"></div><div class="w" id="hg"></div><div class="w" id="hs"></div></section>
+<section data-p="wv" hidden><h2>Waiver Analyzer</h2><div class="note">Starting-lineup points a player scored for the team that added him, from the add week until he was dropped (or the present). Pts/$ is blank for $0 adds. Tap a header to sort.</div><div class="w" id="s8"></div><h2 style="margin-top:18px">Team totals</h2><div class="w" id="s9"></div></section>
 </main>
 <script>
 const P=['QB','RB','WR','TE','FLEX','DST','K'],$=id=>document.getElementById(id);
-const PAGES=[['wins','Expected wins'],['sos','Strength of schedule'],['pos','Position averages'],['dev','Vs. league'],['sched','Schedule comparison'],['trades','Trade analyzer'],['draft','Draft analyzer']];
+const PAGES=[['wins','Expected Wins'],['sos','Strength of Schedule'],['pos','Position Averages'],['dev','Team Averages Vs. League'],['sched','Schedule Comparison'],['trades','Trade Analyzer'],['draft','Draft Analyzer'],['hft','HFT Tracker'],['wv','Waiver Analyzer']];
 const e=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));const f=(x,d=1)=>x.toFixed(d),sg=(x,d=1)=>(x<0?'−':'+')+Math.abs(x).toFixed(d);
 function mock(){
  let s=7;const r=()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
  const g=()=>Math.sqrt(-2*Math.log(1-r()))*Math.cos(2*Math.PI*r());
- const teams=['Gridiron Gurus','Fourth & Long','Blitz Krieg','Hail Mary Inc','Sack Attack','Pigskin Pirates','Red Zone Reapers','Punt Perfect','Taco Tuesday','Dirty Birds'];
+ const teams=['Gridiron Gurus','Fourth & Long','Blitz Krieg','Hail Mary Inc','Sack Attack','Pigskin Pirates','Red Zone Reapers','Punt Perfect','Taco Tuesday','Haddock Football Team'];
  const cfg={QB:[19,2.5,6,12],RB:[12,3,5.5,28],WR:[12.5,3,5.5,28],TE:[8,2.5,3.5,12],DST:[7,1.5,3.5,11],K:[8,1,3,11]};
  const FN=['J.','M.','T.','D.','C.','A.','K.','R.'],LN=['Hart','Cole','Reyes','Boone','Frost','Kane','Voss','Lund','Pike','Wade','Shaw','Cruz','Dunn','Gray'];
  const pool=[];let k=0;Object.entries(cfg).forEach(([p,[m,sp,sd,n]])=>{for(let i=0;i<n;i++,k++)pool.push({n:FN[k%8]+' '+LN[k%14]+(k>=56?' Jr.':''),p,m:m+sp*g(),sd})});
@@ -60,11 +63,12 @@ function mock(){
  for(let pk=0;pk<90;pk++){const rd=Math.floor(pk/10),i=pk%10,ti=rd%2?9-i:i,nd=need[ti];
   let best=null,bv=-1e9;pool.forEach(x=>{if(taken.has(x)||!(nd[x.p]>0||(nd.FLEX>0&&(x.p==='RB'||x.p==='WR'))))return;const v=x.m+g()*3;if(v>bv){bv=v;best=x}});
   const sl=nd[best.p]>0?best.p:'FLEX';nd[sl]--;taken.add(best);ros[ti].push({...best,s:sl});draft.push({pick:pk+1,team:teams[ti],n:best.n,p:best.p});}
- const sw=[[3,0,1,'RB'],[5,2,3,'WR'],[6,4,5,'TE']],trades=[],tot={};pool.forEach(x=>tot[x.n]=0);
+ const sw=[[3,0,1,'RB'],[5,2,3,'WR'],[6,4,5,'TE']],trades=[],waivers=[],tot={},wv=[[2,3,'WR',12],[3,5,'RB',27],[3,9,'K',1],[4,0,'QB',8],[4,7,'TE',3],[5,1,'DST',2],[6,2,'RB',15],[7,8,'WR',31],[5,9,'RB',9]];pool.forEach(x=>tot[x.n]=0);
  let arr=[...Array(10).keys()];const weeks=[];
  for(let w=1;w<=8;w++){
   const dt=new Date(2026,8,10+7*(w-1)-1).toISOString().slice(0,10);
   sw.filter(x=>x[0]===w).forEach(([,a,b,sl])=>{const ia=ros[a].findIndex(x=>x.s===sl),ib=ros[b].findIndex(x=>x.s===sl),pa=ros[a][ia],pb=ros[b][ib];ros[a][ia]=pb;ros[b][ib]=pa;trades.push({date:dt,week:w,teams:[teams[a],teams[b]],moves:[{n:pa.n,p:pa.p,to:teams[b]},{n:pb.n,p:pb.p,to:teams[a]}]})});
+  wv.filter(x=>x[0]===w).forEach(([,ti,sl,bid])=>{const ix=ros[ti].findIndex(x=>x.s===sl);let fa=null;pool.forEach(x=>{if(!taken.has(x)&&x.p===sl&&(!fa||x.m>fa.m))fa=x});if(ix<0||!fa)return;taken.add(fa);ros[ti][ix]={...fa,s:sl};waivers.push({date:dt,week:w,team:teams[ti],n:fa.n,p:fa.p,bid,type:'WAIVER',drop_week:null})});
   const games=[];for(let i=0;i<5;i++)games.push([teams[arr[i]],teams[arr[9-i]]]);
   arr=[arr[0],arr[9],...arr.slice(1,9)];
   const scores={},starters={},on=new Set();
@@ -72,7 +76,7 @@ function mock(){
   pool.filter(x=>!on.has(x.n)).forEach(x=>tot[x.n]+=Math.max(0,x.m*.8+x.sd*g()*.8));
   weeks.push({week:w,games,scores,starters});
  }
- return{updated:'mock data',teams,weeks,draft,trades,players:pool.map(x=>({n:x.n,p:x.p,pts:Math.round(tot[x.n]*10)/10}))};
+ return{updated:'mock data',teams,weeks,draft,trades,waivers,reg_weeks:14,hft:{team:'Haddock Football Team',bench:{name:'The Slapdocks',year:2023,scores:Array.from({length:14},()=>Math.round((112+g()*16)*10)/10)}},players:pool.map(x=>({n:x.n,p:x.p,pts:Math.round(tot[x.n]*10)/10}))};
 }
 function calc(k){
  const W=k?D.weeks.slice(-k):D.weeks,T=D.teams,n=T.length,S={},TW=[];
@@ -134,6 +138,34 @@ function render(){
   const off=T.filter(j=>j!==i).map(j=>m[i][j].p),av=off.reduce((a,b)=>a+b,0)/off.length;
   return[i,...T.map(j=>{const c=m[i][j];return{h:`${c.w}-${c.l}${c.t?'-'+c.t:''}`,v:c.p,s:heat((c.p-.5)*4)+(i===j?';font-weight:700;outline:1px solid var(--ac);outline-offset:-2px':'')}}),{h:f(av*100,0)+'%',v:av,s:''}]}));
 }
+function renderHft(){
+ const H=D.hft;if(!H||!H.bench){$('hn').textContent='No HFT data in data.json yet.';return}
+ const B=H.bench.scores,N=D.reg_weeks||B.length,cum=a=>a.reduce((r,x)=>(r.push((r.length?r[r.length-1]:0)+x),r),[]);
+ const hs=D.weeks.map(w=>Math.round(P.reduce((a,p)=>a+((w.scores[H.team]||{})[p]||0),0)*10)/10),hc=cum(hs),bc=cum(B),pl=hs.length;
+ const hT=hc[pl-1]||0,bT=bc[bc.length-1],left=N-pl,need=left>0?(bT-hT)/left:null,bn=H.bench.name+' '+H.bench.year;
+ $('hn').textContent=`${H.team} vs. ${bn}: cumulative points over the regular season (${N} weeks).`;
+ const card=(b,t)=>`<div><b>${b}</b><span>${t}</span></div>`;
+ $('hc').innerHTML=card(f(hT),`${H.team} total (${pl} wks)`)+card(f(bc[Math.min(pl,B.length)-1]||0),`${bn} through wk ${pl}`)+card(f(bT),`${bn} full season`)+card(f(bT/B.length),`${bn} PPG`)+card(need==null?'–':f(need),`PPG needed over final ${left} wks to beat them`)+card(pl?f(hT/pl):'–','HFT PPG so far');
+ const W=640,X=w=>50+(w-1)*(570/Math.max(1,N-1)),ym=Math.max(bT,hT)*1.05,Y=v=>280-v/ym*250,pt=(a)=>a.map((v,i)=>`${X(i+1)},${Y(v)}`).join(' ');
+ let sv=`<svg viewBox="0 0 640 340" style="width:100%;min-width:480px;max-width:760px" role="img" aria-label="Cumulative points, HFT versus ${e(bn)}">`;
+ for(let i=0;i<=5;i++){const v=ym*i/5;sv+=`<line x1="50" x2="620" y1="${Y(v)}" y2="${Y(v)}" stroke="currentColor" opacity=".1"/><text x="44" y="${Y(v)+3}" text-anchor="end">${Math.round(v)}</text>`}
+ for(let w=1;w<=N;w++)sv+=`<text x="${X(w)}" y="298" text-anchor="middle">${w}</text>`;
+ sv+=`<text x="335" y="316" text-anchor="middle" style="font-size:11px">Week</text>`;
+ if(pl&&left>0)sv+=`<line x1="${X(pl)}" y1="${Y(hT)}" x2="${X(N)}" y2="${Y(bT)}" stroke="#4c78a8" stroke-dasharray="2 4" stroke-width="2"/>`;
+ sv+=`<polyline points="${pt(bc)}" fill="none" stroke="#f58518" stroke-width="2.5" stroke-dasharray="6 4"/><polyline points="${pt(hc)}" fill="none" stroke="#4c78a8" stroke-width="2.5"/>`;
+ hc.forEach((v,i)=>sv+=`<circle cx="${X(i+1)}" cy="${Y(v)}" r="3.5" fill="#4c78a8"><title>HFT wk ${i+1}: ${f(v)}</title></circle>`);
+ bc.forEach((v,i)=>sv+=`<circle cx="${X(i+1)}" cy="${Y(v)}" r="3" fill="#f58518"><title>${e(bn)} wk ${i+1}: ${f(v)}</title></circle>`);
+ sv+=`<rect x="60" y="8" width="10" height="10" fill="#4c78a8"/><text x="76" y="17" style="font-size:12px">${e(H.team)}</text><rect x="240" y="8" width="10" height="10" fill="#f58518"/><text x="256" y="17" style="font-size:12px">${e(bn)}</text><line x1="420" x2="446" y1="13" y2="13" stroke="#4c78a8" stroke-dasharray="2 4" stroke-width="2"/><text x="452" y="17" style="font-size:12px">Pace needed</text>`;
+ $('hg').innerHTML=sv+'</svg>';
+ const rows=[];for(let w=1;w<=N;w++){const h=hs[w-1],b=B[w-1],hcw=hc[w-1],bcw=bc[w-1],d=h==null?null:hcw-bcw;rows.push([{h:w,s:'',v:w},h==null?'–':f(h),b==null?'–':f(b),h==null?'–':f(hcw),bcw==null?'–':f(bcw),d==null?{h:'–',s:'',v:-1e9}:{h:sg(d),s:heat(d/60),v:d}])}
+ $('hs').innerHTML=table(['Week','HFT','Slapdocks','HFT cumulative','Slapdocks cumulative','Cumulative diff'],rows);
+}
+function renderWv(){
+ const wv=D.waivers||[],since=(n,t,a,b)=>D.weeks.filter(w=>w.week>=a&&w.week<(b||1e9)).reduce((s,w)=>s+(w.starters[t]||[]).filter(x=>x.n===n).reduce((q,x)=>q+x.pts,0),0);
+ const rs=wv.map(x=>({...x,pts:since(x.n,x.team,x.week,x.drop_week)})),sp=rs.reduce((a,x)=>a+x.bid,0),L=sp?rs.reduce((a,x)=>a+x.pts,0)/sp:1;
+ $('s8').innerHTML=rs.length?table(['Date','Team','Player','Pos','Type','$','Starter pts','Pts/$'],rs.map(x=>{const r=x.bid>0?x.pts/x.bid:null;return[x.date,e(x.team),e(x.n),x.p,x.type,{h:x.bid,s:'',v:x.bid},{h:f(x.pts),s:'',v:x.pts},r==null?{h:'–',s:'',v:-1}:{h:f(r,2),s:heat((r-L)/L*1.5),v:r}]})):'<div class="note">No waiver adds yet.</div>';
+ $('s9').innerHTML=table(['Team','Adds','$ spent','Starter pts','Pts/$','Pts per add'],D.teams.map(t=>{const l=rs.filter(x=>x.team===t),c=l.reduce((a,x)=>a+x.bid,0),p=l.reduce((a,x)=>a+x.pts,0);return[t,l.length,c,{h:f(p),s:'',v:p},c?{h:f(p/c,2),s:heat((p/c-L)/L*1.5),v:p/c}:{h:'–',s:'',v:-1},l.length?f(p/l.length):'–']}).sort((a,b)=>b[3].v-a[3].v));
+}
 function go(id){
  if(!PAGES.some(p=>p[0]===id))id='wins';
  document.querySelectorAll('section').forEach(s=>s.hidden=s.dataset.p!==id);
@@ -148,5 +180,5 @@ $('nav').onclick=e=>{const a=e.target.closest('a');if(a)go(a.dataset.p)};
 $('mb').onclick=()=>menu($('nav').hidden);
 menu(innerWidth>=700);
 let D;
-fetch('data.json').then(r=>r.ok?r.json():Promise.reject()).catch(()=>{$('mock').hidden=false;return mock()}).then(d=>{D=d;$('rng').onchange=render;render();go(location.hash.slice(1))});
+fetch('data.json').then(r=>r.ok?r.json():Promise.reject()).catch(()=>{$('mock').hidden=false;return mock()}).then(d=>{D=d;$('rng').onchange=render;render();renderHft();renderWv();go(location.hash.slice(1))});
 </script></body></html>
