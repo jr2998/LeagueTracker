@@ -6,6 +6,7 @@ try:
     load_dotenv()
 except ImportError:
     pass
+from zoneinfo import ZoneInfo
 from espn_api.football import League
 
 LEAGUE_ID = int(os.environ["LEAGUE_ID"])
@@ -19,10 +20,21 @@ league = League(league_id=LEAGUE_ID, year=YEAR,
 SLOT = {"QB": "QB", "RB": "RB", "WR": "WR", "TE": "TE",
         "RB/WR/TE": "FLEX", "D/ST": "DST", "K": "K"}      # check your league's slot names
 fix = lambda p: {"D/ST": "DST"}.get(p, p)
+# activity actions return Player objects, not strings, for the player field
+pname = lambda x: getattr(x, "name", None) or str(x)
 
 # ---- weekly scores, matchups, starters ----
 weeks = []
-last = min(league.current_week, league.settings.reg_season_count)
+# Only pull FULL weeks: a week is complete once Monday night is over (Tuesday 12:00am Eastern).
+ET = ZoneInfo("America/New_York")
+NOW = datetime.datetime.now(ET)
+def week_complete(w):
+    monday = SEASON_START + datetime.timedelta(days=(w - 1) * 7 + 4)   # Thursday + 4 = Monday
+    end = datetime.datetime.combine(monday + datetime.timedelta(days=1), datetime.time.min, tzinfo=ET)
+    return NOW >= end
+done = [w for w in range(1, league.settings.reg_season_count + 1) if week_complete(w)]
+last = min(max(done, default=0), league.current_week)
+print(f"pulling completed weeks 1-{last} (now {NOW:%Y-%m-%d %H:%M} ET)")
 for w in range(1, last + 1):
     games, scores, starters = [], {}, {}
     for bs in league.box_scores(w):
@@ -80,7 +92,7 @@ def to_week(day):
 raw, trades = [], []
 activity = league.recent_activity(size=1000)
 for a in activity:
-    acts = [(t.team_name, act, name) for t, act, name, _ in a.actions if "TRADE" in str(act).upper()]
+    acts = [(t.team_name, act, pname(name)) for t, act, name, _ in a.actions if "TRADE" in str(act).upper()]
     if not acts:
         continue
     raw.append({"date": a.date, "actions": acts})
@@ -100,11 +112,11 @@ for a in activity:
     for t, act, name, bid in a.actions:
         u = str(act).upper()
         if "ADDED" in u:
-            adds.append((a.date, t.team_name, name, bid, u))
+            adds.append((a.date, t.team_name, pname(name), bid, u))
         elif "DROPPED" in u:
-            drops.append((a.date, t.team_name, name))
+            drops.append((a.date, t.team_name, pname(name)))
 waivers = []
-for ts, team, name, bid, u in sorted(adds):
+for ts, team, name, bid, u in sorted(adds, key=lambda x: x[0]):
     day = datetime.date.fromtimestamp(ts / 1000)
     later = [d[0] for d in drops if d[1] == team and d[2] == name and d[0] > ts]
     dw = to_week(datetime.date.fromtimestamp(min(later) / 1000)) if later else None
