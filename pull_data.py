@@ -23,7 +23,7 @@ fix = lambda p: {"D/ST": "DST"}.get(p, p)
 pname = lambda x: getattr(x, "name", None) or str(x)      # activity actions hold Player objects
 norm = lambda s: re.sub(r"[^a-z0-9]", "", str(s).lower())
 
-errors = []
+errors, warnings = [], []
 @contextlib.contextmanager
 def guard(name):
     try:
@@ -73,7 +73,7 @@ if not weeks:
     sys.exit("No completed weeks found; not overwriting data.json. Check SEASON_START and credentials.")
 
 # ---- draft + player pool (season points) ----
-draft, pool = [], {}
+draft, pool, current_owner = [], {}, {}
 with guard("draft"):
     n_teams = len(league.teams)
     for d in league.draft:
@@ -89,6 +89,7 @@ with guard("rosters"):
     for t in league.teams:
         for pl in t.roster:
             pool.setdefault(pl.name, {"n": pl.name, "p": fix(pl.position), "pts": pl.total_points})
+            current_owner[pl.name] = t.team_name
 print(f"draft picks: {len(draft)}, pool players: {len(pool)}")
 
 # ---- transactions: trades + waiver/FA adds (VERIFY against debug_trades.json) ----
@@ -101,6 +102,31 @@ def lookup_pos(name):
         return fix(r.position) if r else ""
     except Exception:
         return ""
+
+# Who received each traded player? The activity feed lists every traded player under BOTH teams,
+# so it can't tell us the direction. Instead use roster history from the weekly box scores:
+#   - nearest earlier week where the player was on one of the two teams -> that team SENT him
+#   - otherwise first later week (or the current roster) where he is on one of the two -> RECEIVED
+holder = {}   # (week, player) -> team (starters + bench; IR players are not in box-score lineups)
+for wk in weeks:
+    for team, lst in list(wk["starters"].items()) + list(wk["bench"].items()):
+        for x in lst:
+            holder[(wk["week"], x["n"])] = team
+
+def resolve_receiver(name, pair, trade_week, holder, current_owner, last_week):
+    a, b = pair
+    for w in range(trade_week - 1, 0, -1):          # before the trade
+        h = holder.get((w, name))
+        if h is not None:
+            if h in pair:
+                return b if h == a else a
+            break                                   # was on a third team: fall through to "after"
+    for w in range(trade_week, last_week + 1):      # after the trade
+        h = holder.get((w, name))
+        if h in pair:
+            return h
+    h = current_owner.get(name)
+    return h if h in pair else None
 
 def to_week(day):   # weeks roll over Tuesday: a Wednesday-before-week-3 move maps to week 3
     return max(1, ((day - SEASON_START).days - 5) // 7 + 2)
@@ -118,9 +144,14 @@ with guard("transactions"):
             raw.append({"date": str(a.date), "actions": acts})
             teams = sorted({t for t, _ in tr})
             if len(teams) == 2:  # only 2-team trades supported
-                # ASSUMPTION: the team on each action is the team that received the player
-                trades.append({"date": day.isoformat(), "week": to_week(day), "teams": teams,
-                               "moves": [{"n": n, "p": lookup_pos(n), "to": t} for t, n in tr]})
+                tw, moves = to_week(day), []
+                for n in dict.fromkeys(n for _, n in tr):          # each player once
+                    r = resolve_receiver(n, teams, tw, holder, current_owner, last)
+                    if r is None:
+                        warnings.append(f"Trade {day} {teams[0]} / {teams[1]}: could not tell who received {n}")
+                    else:
+                        moves.append({"n": n, "p": lookup_pos(n), "to": r})
+                trades.append({"date": day.isoformat(), "week": tw, "teams": teams, "moves": moves})
         for t, act, n, bid in acts:
             u = act.upper()
             if "ADDED" in u:
@@ -136,6 +167,8 @@ with guard("transactions"):
                         "type": "WAIVER" if "WAIVER" in u else "FA", "drop_week": dw})
     json.dump(raw, open("debug_trades.json", "w"), indent=2, default=str)
 print(f"trades: {len(trades)}, waiver/FA adds: {len(waivers)}")
+for w_ in warnings:
+    print("WARNING:", w_)
 
 # ---- HFT tracker: this season's team vs. a past season's team ----
 HFT_MATCH = norm(os.environ.get("HFT_TEAM", "haddock"))
@@ -181,6 +214,6 @@ json.dump({"updated": datetime.date.today().isoformat(),
            "teams": [t.team_name for t in league.teams],
            "weeks": weeks, "draft": draft, "players": list(pool.values()),
            "trades": trades, "waivers": waivers, "hft": hft, "hft_note": hft_note,
-           "debug": {"errors": errors}},
+           "debug": {"errors": errors, "warnings": warnings}},
           open("data.json", "w"))
 print("wrote data.json", "(with errors: %s)" % errors if errors else "")
