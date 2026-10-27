@@ -1,8 +1,8 @@
 name: Update stats
 on:
   schedule:
-    - cron: "0 7 * * 2"   # 3am EDT
-    - cron: "0 8 * * 2"   # 3am EST (after the November clock change)
+    - cron: "0 4 * * 2"   # 3am EDT
+    - cron: "0 5 * * 2"   # 3am EST (after the November clock change)
   workflow_dispatch:
 permissions:
   contents: write
