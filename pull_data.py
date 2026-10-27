@@ -48,23 +48,26 @@ print(f"pulling completed weeks 1-{last} (now {NOW:%Y-%m-%d %H:%M} ET, season st
 
 weeks = []
 for w in range(1, last + 1):
-    games, scores, starters = [], {}, {}
+    games, scores, starters, benches = [], {}, {}, {}
     for bs in league.box_scores(w):
         if not (hasattr(bs.home_team, "team_name") and hasattr(bs.away_team, "team_name")):
             continue  # bye
         games.append([bs.home_team.team_name, bs.away_team.team_name])
         for team, lineup in [(bs.home_team, bs.home_lineup), (bs.away_team, bs.away_lineup)]:
-            d, st = {v: 0.0 for v in SLOT.values()}, []
+            d, st, bn = {v: 0.0 for v in SLOT.values()}, [], []
             for pl in lineup:
                 slot = SLOT.get(pl.slot_position)
                 if slot is None:
-                    continue  # bench / IR
+                    if pl.slot_position == "BE":   # bench only (IR players cannot be started)
+                        bn.append({"n": pl.name, "p": fix(pl.position), "pts": pl.points})
+                    continue
                 d[slot] += pl.points
                 st.append({"n": pl.name, "p": fix(pl.position), "s": slot, "pts": pl.points})
             scores[team.team_name] = {k: round(v, 1) for k, v in d.items()}
             starters[team.team_name] = st
+            benches[team.team_name] = bn
     if scores and sum(sum(v.values()) for v in scores.values()) > 0:
-        weeks.append({"week": w, "games": games, "scores": scores, "starters": starters})
+        weeks.append({"week": w, "games": games, "scores": scores, "starters": starters, "bench": benches})
 print(f"weeks: {[x['week'] for x in weeks]}")
 if not weeks:
     sys.exit("No completed weeks found; not overwriting data.json. Check SEASON_START and credentials.")
