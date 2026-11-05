@@ -32,6 +32,7 @@ tr.lg td{font-weight:700}td small{display:block;color:var(--mu);font-size:11px}
 .banner{border:1px dashed var(--ac);color:var(--ac);border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:12px}
 .bar[hidden]{display:none}.lgd{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--mu);margin-top:8px}.lgd i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}svg text{fill:var(--mu);font-size:10px}
 .cards{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.cards div{flex:1 1 150px;border:1px solid var(--bd);border-radius:10px;padding:10px 12px}.cards b{display:block;font-size:20px}.cards span{color:var(--mu);font-size:12px}
+.tg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:10px}.tp{border:1px solid var(--bd);border-radius:10px;padding:8px 10px}.tp h3{margin:0 0 2px;font-size:14px}.tp svg{width:100%;height:auto;display:block}
 </style></head><body>
 <header><div class="top"><b>🏈 League Stats</b><span id="cur"></span><button id="mb" aria-expanded="false" aria-controls="nav">☰ Menu</button></div>
 <nav id="nav" hidden></nav></header>
@@ -41,7 +42,7 @@ tr.lg td{font-weight:700}td small{display:block;color:var(--mu);font-size:11px}
 <section data-p="wins"><h2>Expected Wins</h2><div class="note">Each week, win probability is the share of other teams you outscored. Diff is actual wins minus expected (positive means lucky). Tap a column header to sort.</div><div class="w" id="s1"></div></section>
 <section data-p="sos" hidden><h2>Strength of Schedule</h2><div class="note">Opponent points per game vs. the league average. Positive means a tougher schedule.</div><div class="w" id="s2"></div></section>
 <section data-p="pos" hidden><h2>Average Scoring by Position</h2><div class="note">Starting lineup slots only.</div><div class="w" id="s3"></div></section>
-<section data-p="dev" hidden><h2>Vs. League Average by Position</h2><div class="note">Standard deviations from the league mean (spread of team averages), with the point difference per game beneath.</div><div class="w" id="s4"></div><h2 style="margin-top:18px">Standard Deviations by Position</h2><label>Team <select id="tsel"></select></label><div class="w" id="ch"></div></section>
+<section data-p="dev" hidden><h2>Vs. League Average by Position</h2><div class="note">Standard deviations from the league mean (spread of team averages), with the point difference per game beneath.</div><div class="w" id="s4"></div><h2 style="margin-top:18px">Standard Deviations by Team</h2><div class="note">Every pane uses the same scale, so bars are comparable across teams. Green is above the league average, red is below.</div><div class="tg" id="ch"></div></section>
 <section data-p="sched" hidden><h2>Schedule Comparison</h2><div class="note">Each row is a team’s weekly scores; each column is whose schedule they play. When a schedule’s opponent that week was the row team itself, the row team’s actual matchup against that schedule’s owner is used, so every cell covers the same number of games. The outlined diagonal is the actual record.</div><div class="w" id="s5"></div></section>
 <section data-p="coach" hidden><h2>Coaching</h2><div class="note">Optimal lineup is the highest-scoring lineup possible from every non-IR player on the roster that week, filling the same slots as the starting lineup (flex takes the best remaining RB/WR/TE). Efficiency is starting points divided by optimal points. Follows the time range above.</div><div class="w" id="s10"></div></section>
 <section data-p="trades" hidden><h2>Trade Analyzer</h2><div class="note">Points scored in the starting lineup since each trade by the players each team received. Edge is the first team minus the second team.</div><div class="w" id="s6"></div></section>
@@ -118,16 +119,14 @@ function render(){
   [...T].sort((a,b)=>S[b].op/S[b].gp-S[a].op/S[a].gp).map(t=>{const o=S[t].op/S[t].gp;return[t,f(S[t].rk/S[t].gp),f(o),{h:sg(o-lg.tot),s:heat((lg.tot-o)/8)},S[t].top+'×',S[t].low+'×']}));
  $('s3').innerHTML=table(['Team',...P,'Total'],[...byTot.map(t=>[t,...[...P,'tot'].map(p=>({h:f(avg[t][p]),s:heat(zc(t,p))}))]),['League avg',...P.map(p=>f(lg[p])),f(lg.tot)]],true);
  $('s4').innerHTML=table(['Team',...P],byTot.map(t=>[t,...P.map(p=>({h:`${sg(avg[t][p]-lg[p])}<small>${sg(zc(t,p))} st.dev.</small>`,s:heat(zc(t,p))}))]));
- const sel=$('tsel');
- if(sel.options.length!==T.length){const cur=sel.value;sel.innerHTML=T.map(t=>`<option value="${e(t)}">${e(t)}</option>`).join('');if(cur)sel.value=cur}
- const draw=()=>{const t=sel.value||T[0],zs=P.map(p=>zc(t,p)),mx=Math.max(2,...zs.map(Math.abs)),mid=130,ks=105/mx;
-  let sv=`<svg viewBox="0 0 640 290" style="width:100%;min-width:480px;max-width:720px" role="img" aria-label="Standard deviations for ${e(t)}">`;
-  for(let z=-Math.floor(mx);z<=Math.floor(mx);z++)sv+=`<line x1="40" x2="630" y1="${mid-z*ks}" y2="${mid-z*ks}" stroke="currentColor" opacity="${z?.1:.4}"/><text x="34" y="${mid-z*ks+3}" text-anchor="end">${z}</text>`;
-  P.forEach((p,j)=>{const z=zs[j],d=avg[t][p]-lg[p],h=Math.abs(z)*ks,x=62+j*84;
-   sv+=`<rect x="${x}" y="${z>=0?mid-h:mid}" width="52" height="${h}" rx="3" fill="${z>=0?'#2ea043':'#da3633'}"><title>${p}: ${sg(z)} st.dev. (${sg(d)} pts)</title></rect><text x="${x+26}" y="${z>=0?mid-h-6:mid+h+14}" text-anchor="middle" style="font-size:12px;font-weight:600">${sg(z)}</text><text x="${x+26}" y="262" text-anchor="middle" style="font-size:12px">${p}</text><text x="${x+26}" y="277" text-anchor="middle">${sg(d)} pts</text>`});
-  $('ch').innerHTML=sv+'</svg>'};
- sel.onchange=draw;draw();
-  const since=(n,t,wk)=>D.weeks.filter(w=>w.week>=wk).reduce((a,w)=>a+(w.starters[t]||[]).filter(x=>x.n===n).reduce((b,x)=>b+x.pts,0),0);
+ const mx=Math.max(2,...T.flatMap(t=>P.map(p=>Math.abs(zc(t,p))))),ks=58/mx,mid=78;
+ $('ch').innerHTML=byTot.map(t=>{
+  let sv=`<svg viewBox="0 0 320 190" role="img" aria-label="Standard deviations for ${e(t)}">`;
+  for(let z=-Math.floor(mx);z<=Math.floor(mx);z++)sv+=`<line x1="26" x2="316" y1="${mid-z*ks}" y2="${mid-z*ks}" stroke="currentColor" opacity="${z?.1:.4}"/><text x="20" y="${mid-z*ks+3}" text-anchor="end">${z}</text>`;
+  P.forEach((p,j)=>{const z=zc(t,p),d=avg[t][p]-lg[p],h=Math.abs(z)*ks,x=32+j*40;
+   sv+=`<rect x="${x}" y="${z>=0?mid-h:mid}" width="28" height="${h}" rx="2" fill="${z>=0?'#2ea043':'#da3633'}"><title>${e(t)} ${p}: ${sg(z)} st.dev. (${sg(d)} pts)</title></rect><text x="${x+14}" y="${z>=0?mid-h-4:mid+h+11}" text-anchor="middle" style="font-size:10px;font-weight:600">${sg(z)}</text><text x="${x+14}" y="166" text-anchor="middle" style="font-size:10px">${p}</text><text x="${x+14}" y="180" text-anchor="middle" style="font-size:9px">${sg(d)}</text>`});
+  return `<div class="tp"><h3>${e(t)}</h3>${sv}</svg></div>`}).join('');
+   const since=(n,t,wk)=>D.weeks.filter(w=>w.week>=wk).reduce((a,w)=>a+(w.starters[t]||[]).filter(x=>x.n===n).reduce((b,x)=>b+x.pts,0),0);
  const side=(tr,t)=>{const mv=tr.moves.filter(m=>m.to===t),ps=mv.map(m=>since(m.n,t,tr.week));return{h:mv.map((m,i)=>`${e(m.n)} (${m.p}) ${f(ps[i])}`).join('<br>'),pts:ps.reduce((a,b)=>a+b,0)}};
  $('s6').innerHTML=(D.trades||[]).length?table(['Date','Team','Receives (pts since)','Pts','Team','Receives (pts since)','Pts','Edge'],D.trades.map(tr=>{const[a,b]=tr.teams,A=side(tr,a),B=side(tr,b);return[tr.date,e(a),{h:A.h,s:'white-space:normal;min-width:150px;font-size:13px',v:A.h},{h:f(A.pts),s:'font-weight:700',v:A.pts},e(b),{h:B.h,s:'white-space:normal;min-width:150px;font-size:13px',v:B.h},{h:f(B.pts),s:'font-weight:700',v:B.pts},{h:sg(A.pts-B.pts),s:heat((A.pts-B.pts)/40),v:A.pts-B.pts}]})):'<div class="note">No trades yet.</div>';
  const cnt={},cr={},dr=D.draft.filter(x=>x.p!=='DST'&&x.p!=='K');
